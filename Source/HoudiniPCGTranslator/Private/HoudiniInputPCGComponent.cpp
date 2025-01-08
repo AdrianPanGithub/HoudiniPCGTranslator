@@ -43,7 +43,7 @@ bool FHoudiniPCGComponentInputBuilder::IsValidInput(const UActorComponent* Compo
 
 
 
-namespace HoudiniInputPCGDataAssetUtils
+namespace HoudiniPCGDataInputUtils
 {
 	template<typename StrValueType>
 	static bool HapiUploadStringAttribValue(const UPCGMetadata* MetaData, const FName& AttribName,
@@ -57,7 +57,7 @@ namespace HoudiniInputPCGDataAssetUtils
 }
 
 template<typename StrValueType>
-static bool HoudiniInputPCGDataAssetUtils::HapiUploadStringAttribValue(const UPCGMetadata* MetaData, const FName& AttribName,
+static bool HoudiniPCGDataInputUtils::HapiUploadStringAttribValue(const UPCGMetadata* MetaData, const FName& AttribName,
 	const int32& NodeId, HAPI_AttributeInfo& AttribInfo, TFunctionRef<FString(const StrValueType&)> ConvertFunc)
 {
 	if (const FPCGMetadataAttribute<StrValueType>* Attrib = MetaData->GetConstTypedAttribute<StrValueType>(AttribName))
@@ -128,7 +128,7 @@ static bool HoudiniInputPCGDataAssetUtils::HapiUploadStringAttribValue(const UPC
 
 template<typename ValueType, typename HapiValueType, int TupleSize, HAPI_StorageType Storage, HAPI_AttributeTypeInfo AttribType,
 	typename SetUniqueAttribValueHapi, typename SetAttribValueHapi>
-static bool HoudiniInputPCGDataAssetUtils::HapiUploadNumericAttribValue(const UPCGMetadata* MetaData, const FName& AttribName,
+static bool HoudiniPCGDataInputUtils::HapiUploadNumericAttribValue(const UPCGMetadata* MetaData, const FName& AttribName,
 	const int32& NodeId, HAPI_AttributeInfo& AttribInfo, TFunctionRef<void(const ValueType&, TArray<HapiValueType>&)> ConvertFunc,
 	SetUniqueAttribValueHapi SetUniqueAttribValueHapiFunc, SetAttribValueHapi SetAttribValueHapiFunc)
 {
@@ -184,14 +184,14 @@ static bool HoudiniInputPCGDataAssetUtils::HapiUploadNumericAttribValue(const UP
 	return true;
 }
 
-using namespace HoudiniInputPCGDataAssetUtils;
+using namespace HoudiniPCGDataInputUtils;
 
 bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UObject* InputObject,
 	const FPCGDataCollection& Data, TArray<int32>& InOutNodeIds, int32& InOutDataIdx)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniInputPCGData);
 
-	// TODO: use my shared memory input API like other input translators in my houdini engine, since the performance of HAPI is NOT ideal
+	// TODO: should use my shared memory input API like other input translators in my houdini engine, since the performance of HAPI is NOT ideal
 
 
 	HAPI_AttributeInfo AttribInfo;
@@ -643,6 +643,7 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 					HAPI_ATTRIB_POSITION, &AttribInfo, PosData.GetData(), 0, AttribInfo.count));
 			}
 
+			if (PartInfo.faceCount >= 1)  // Sometimes maybe dynamic mesh only has points
 			{
 				TArray<int32> FaceCounts; FaceCounts.SetNumUninitialized(PartInfo.faceCount);
 				TArray<int32> Vertices; Vertices.SetNumUninitialized(PartInfo.vertexCount);
@@ -662,6 +663,8 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetFaceCounts(FHoudiniEngine::Get().GetSession(), NodeId, 0,
 					FaceCounts.GetData(), 0, FaceCounts.Num()));
 			}
+
+			// TODO: Retreive all attributes v@N, v@uv, s@unreal_material, etc.
 
 			HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CommitGeo(FHoudiniEngine::Get().GetSession(), NodeId));
 			if (bCreateNewNode)

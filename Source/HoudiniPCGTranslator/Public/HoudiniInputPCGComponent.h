@@ -16,7 +16,7 @@ public:
 
 	virtual bool HapiDestroy(UHoudiniInput* Input) const override;  // Will then delete this, so we need NOT to empty NodeIds
 
-	// TODO: use my shared memory input API like other input translators in my houdini engine, since the performance of HAPI is NOT ideal
+	// TODO: should use my shared memory input API like other input translators in my houdini engine, since the performance of HAPI is NOT ideal
 	HOUDINIPCGTRANSLATOR_API static bool HapiRetreiveData(UHoudiniInput* Input, const UObject* InputObject,
 		const FPCGDataCollection& Data, TArray<int32>& InOutNodeIds, int32& InOutDataIdx);
 };

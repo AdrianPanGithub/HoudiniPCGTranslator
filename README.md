@@ -3,11 +3,11 @@
 Welcome to the [repository](https://github.com/AdrianPanGithub/HoudiniPCGTranslator) for the Houdini PCG Translator For Unreal.
 
 This plug-in provides seamless integration between Houdini Engine and Unreal PCG, without any exchange files. Allow both PCGDataAsset input and output, and PCGComponent input.
-Also see [Tutorial](https://www.youtube.com/@adrianpan9211)
+Also see [Tutorial](https://youtu.be/MLbhgsCSqoQ)
 
 # Compatibility
 
-This plug-in is reply on **my custom** [HoudiniEngineForUnreal](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal), so similar compatibility as the Houdini Engine, but only support Unreal >= 5.4 (Examples only run with 5.5).
+This plug-in is reply on **my custom** [HoudiniEngineForUnreal](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal), so similar [compatibility](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal#compatibility) as the Houdini Engine, but only support Unreal >= 5.4 (Examples only run with 5.5).
 
 # Installation
 01. In this GitHub [repository](https://github.com/AdrianPanGithub/HoudiniPCGTranslator), click **Releases** on the right side. 
@@ -17,7 +17,7 @@ This plug-in is reply on **my custom** [HoudiniEngineForUnreal](https://github.c
     e.g. `C:/Unreal Projects/MyGameProject/Plugins/HoudiniPCGTranslator` and `C:/Unreal Projects/MyGameProject/Plugins/HoudiniEngine`
 
 # Tutorial/Example
-[Tutorial](https://www.youtube.com/@adrianpan9211)
+[Tutorial](https://youtu.be/MLbhgsCSqoQ)
 Require Unreal Engine >= 5.5 to run these examples.
 See `/HoudiniPCGTranslator/Example/EUBP_HE_Example_PCGDataInput` and `/HoudiniPCGTranslator/Example/he_example_pcg_data_output` in the content of this plug-in.
 
@@ -35,9 +35,12 @@ i@**unreal_output_pcg_data_asset**
 @**unreal_pcg_attribute_***
 
     define a PCG attribute, support float, int, vectors, transform, quaternion, object path, string etc.
+s@**unreal_object_path**
+
+    define where PCGDataAsset should be created at.
 @**P, p@rot, v@scale**
 
-    General attributes for PCGSplineData and PCGPointData input and output
+    General attributes for PCGSplineData and PCGPointData input and output. For PCGSplineData input, must add parm tag { import_rot_and_scale = 1 } to operator path input parm.
 f@**density, v@Cd, f@Alpha**
 
     General attributes for both PCGPointData input and output

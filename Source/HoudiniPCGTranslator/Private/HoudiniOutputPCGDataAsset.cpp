@@ -15,6 +15,10 @@
 #include "PCGDataAsset.h"
 #include "Data/PCGPointData.h"
 #include "Data/PCGSplineData.h"
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#include "Data/PCGDynamicMeshData.h"
+#include "UDynamicMesh.h"
+#endif
 
 
 bool FHoudiniPCGDataAssetOutputBuilder::HapiIsPartValid(const int32& NodeId, const HAPI_PartInfo& PartInfo, bool& bOutIsValid, bool& bOutShouldHoldByOutput)
@@ -22,7 +26,11 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiIsPartValid(const int32& NodeId, con
 	bOutShouldHoldByOutput = false;  // Only output to content as assets
 	bOutIsValid = false;
 
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+	if ((PartInfo.type == HAPI_PARTTYPE_MESH) || (PartInfo.type == HAPI_PARTTYPE_CURVE))  // Can output point cloud, splines, or dynamic mesh data
+#else
 	if (((PartInfo.type == HAPI_PARTTYPE_MESH) && (PartInfo.faceCount <= 0)) || (PartInfo.type == HAPI_PARTTYPE_CURVE))  // Can output point cloud or spline data
+#endif
 	{
 		const int32& PartId = PartInfo.id;
 
@@ -45,7 +53,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiIsPartValid(const int32& NodeId, con
 	return true;
 }
 
-namespace HoudiniOutputPCGDataAsset
+namespace HoudiniPCGDataOutputUtils
 {
 	template<typename HapiValueType, typename ValueType, typename GetAttribValueHapi>
 	static bool HapiCreateNumericPCGAttribute(const int32& NodeId, const int32& PartId, HAPI_AttributeInfo& AttribInfo,
@@ -61,7 +69,7 @@ namespace HoudiniOutputPCGDataAsset
 }
 
 template<typename HapiValueType, typename ValueType, typename GetAttribValueHapi>
-static bool HoudiniOutputPCGDataAsset::HapiCreateNumericPCGAttribute(const int32& NodeId, const int32& PartId, HAPI_AttributeInfo& AttribInfo,
+static bool HoudiniPCGDataOutputUtils::HapiCreateNumericPCGAttribute(const int32& NodeId, const int32& PartId, HAPI_AttributeInfo& AttribInfo,
 	const std::string& AttribNameStr, GetAttribValueHapi GetAttribValueHapiFunc,
 	UPCGMetadata* Metadata, const FName& AttribName, const ValueType& DefaultValue, TArray<PCGMetadataEntryKey>& EntryKeys)
 {
@@ -82,7 +90,7 @@ static bool HoudiniOutputPCGDataAsset::HapiCreateNumericPCGAttribute(const int32
 }
 
 template<typename HapiValueType, typename ValueType, typename GetAttribValueHapi>
-static bool HoudiniOutputPCGDataAsset::HapiCreateNumericPCGAttribute(const int32& NodeId, const int32& PartId, HAPI_AttributeInfo& AttribInfo,
+static bool HoudiniPCGDataOutputUtils::HapiCreateNumericPCGAttribute(const int32& NodeId, const int32& PartId, HAPI_AttributeInfo& AttribInfo,
 	const std::string& AttribNameStr, GetAttribValueHapi GetAttribValueHapiFunc, TFunctionRef<ValueType(const TArray<HapiValueType>&, const int32&)> ConvertFunc,
 	UPCGMetadata* Metadata, const FName& AttribName, const ValueType& DefaultValue, TArray<PCGMetadataEntryKey>& EntryKeys)
 {
@@ -106,7 +114,7 @@ static bool HoudiniOutputPCGDataAsset::HapiCreateNumericPCGAttribute(const int32
 	return true;
 }
 
-static int32 HoudiniOutputPCGDataAsset::GetSplineAttributeElemIdx(const HAPI_AttributeOwner& AttribOwner, const int32& VtxIdx, const int32& CurveIdx)
+static int32 HoudiniPCGDataOutputUtils::GetSplineAttributeElemIdx(const HAPI_AttributeOwner& AttribOwner, const int32& VtxIdx, const int32& CurveIdx)
 {
 	switch (AttribOwner)
 	{
@@ -119,12 +127,12 @@ static int32 HoudiniOutputPCGDataAsset::GetSplineAttributeElemIdx(const HAPI_Att
 	return -1;
 }
 
-using namespace HoudiniOutputPCGDataAsset;
+using namespace HoudiniPCGDataOutputUtils;
 
 
 bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const FString& OutputName, const HAPI_GeoInfo& GeoInfo, const TArray<HAPI_PartInfo>& PartInfos)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniOutputPCGDataAsset);
+	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniPCGDataOutputUtils);
 
 	const int32& NodeId = GeoInfo.nodeId;
 
@@ -150,7 +158,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 			PCGDAs.Add(PCGDA);
 		}
 
-		if (PartInfo.type == HAPI_PARTTYPE_MESH)  // Point cloud
+		if ((PartInfo.type == HAPI_PARTTYPE_MESH) && (PartInfo.faceCount <= 0))  // Point cloud
 		{
 			FPCGTaggedData TaggedData;
 			UPCGPointData* PointData = NewObject<UPCGPointData>(PCGDA);
@@ -622,6 +630,71 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 				++CurveIdx;
 			}
 		}
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+		if ((PartInfo.type == HAPI_PARTTYPE_MESH) && (PartInfo.faceCount >= 1))  // Mesh
+		{
+			FPCGTaggedData TaggedData;
+			UPCGDynamicMeshData* DMData = NewObject<UPCGDynamicMeshData>(PCGDA);
+			TaggedData.Data = DMData;
+
+			HAPI_AttributeInfo AttribInfo;
+
+			// TODO: should copy the code from my houdini engine to support full dynamic mesh attributes and materials
+
+			// -------- Retrieve mesh data --------
+			TArray<float> PositionData;
+			PositionData.SetNumUninitialized(PartInfo.pointCount * 3);
+
+			HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetAttributeInfo(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+				HAPI_ATTRIB_POSITION, HAPI_ATTROWNER_POINT, &AttribInfo));
+
+			HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetAttributeFloatData(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+				HAPI_ATTRIB_POSITION, &AttribInfo, -1, PositionData.GetData(), 0, PartInfo.pointCount));
+
+			TArray<int32> Vertices;
+			Vertices.SetNumUninitialized(PartInfo.vertexCount);
+			HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetVertexList(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+				Vertices.GetData(), 0, PartInfo.vertexCount));
+
+			FDynamicMesh3 DM;
+
+			TMap<int32, int> PointIdxMap;  // PointIdx map to dynamic mesh vertex idx
+			for (int32 TriIdx = 0; TriIdx < PartInfo.faceCount; ++TriIdx)
+			{
+				const FIntVector3 HoudiniPoints(Vertices[TriIdx * 3], Vertices[TriIdx * 3 + 1], Vertices[TriIdx * 3 + 2]);
+				if ((HoudiniPoints.X == HoudiniPoints.Y) || (HoudiniPoints.Y == HoudiniPoints.Z) || (HoudiniPoints.Z == HoudiniPoints.X))  // Skip degenerated triangle
+					continue;
+
+				FIntVector3 IsNewPoints = FIntVector3::ZeroValue;
+				UE::Geometry::FIndex3i Triangle;
+				for (int32 TriVtxIdx = 0; TriVtxIdx < 3; ++TriVtxIdx)
+				{
+					const int32& GlobalPointIdx = HoudiniPoints[TriVtxIdx];  // This PointIdx is in global
+					int LocalPointIdx;
+					{
+						const int* FoundLocalPointIdxPtr = PointIdxMap.Find(GlobalPointIdx);
+						if (!FoundLocalPointIdxPtr)
+						{
+							LocalPointIdx = DM.AppendVertex(POSITION_SCALE_TO_UNREAL *
+								FVector3d(PositionData[GlobalPointIdx * 3], PositionData[GlobalPointIdx * 3 + 2], PositionData[GlobalPointIdx * 3 + 1]));
+							PointIdxMap.Add(GlobalPointIdx, LocalPointIdx);
+							IsNewPoints[TriVtxIdx] = 1;
+						}
+						else
+							LocalPointIdx = *FoundLocalPointIdxPtr;
+					}
+
+					Triangle[2 - TriVtxIdx] = LocalPointIdx;
+				}
+
+				DM.AppendTriangle(Triangle.A, Triangle.B, Triangle.C, 0);
+			}
+
+			DMData->Initialize(UE::Geometry::FDynamicMesh3(DM));
+
+			PCGDA->Data.AddData(TaggedData, TaggedData.ComputeCrc(false));
+		}
+#endif
 	}
 
 	for (UPCGDataAsset* PCGDA : PCGDAs)

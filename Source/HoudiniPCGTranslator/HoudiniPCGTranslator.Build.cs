@@ -36,7 +36,8 @@ public class HoudiniPCGTranslator : ModuleRules
 				"CoreUObject",
 				"Engine",
                 "HoudiniEngine",
-				"PCG",
+                "GeometryCore",
+                "PCG",
                 "PCGGeometryScriptInterop"
             }
 			);
