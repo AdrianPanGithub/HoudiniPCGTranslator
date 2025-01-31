@@ -10,7 +10,7 @@ Also see [Tutorial](https://youtu.be/MLbhgsCSqoQ)
 This plug-in is reply on **my custom** [HoudiniEngineForUnreal](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal), so similar [compatibility](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal#compatibility) as the Houdini Engine, but only support Unreal >= 5.4 (Examples only run with 5.5).
 
 # Installation
-01. In this GitHub [repository](https://github.com/AdrianPanGithub/HoudiniPCGTranslator), click **Releases** on the right side. 
+01. In this GitHub [repository](https://github.com/AdrianPanGithub/HoudiniPCGTranslator), click [Releases](https://github.com/AdrianPanGithub/HoudiniPCGTranslator/releases) on the right side. 
 02. Download the Houdini PCG Transaltor zip file that matches your Unreal Engine Version.
 03. Extract the **HoudiniPCGTranslator** and **HoudiniEngine** to the **Plugins** of your Unreal Project Directory.
 
@@ -31,7 +31,7 @@ Here are some attributes for PCG data input and output
 
 i@**unreal_output_pcg_data_asset**
 
-    = 1 on detail, curves/points will output as PCGSplineData/PCGPointData in PCGDataAsset
+    = 1 on detail, curves/points will output as PCGSplineData/PCGPointData/PCGDynamicMeshData in PCGDataAsset
 @**unreal_pcg_attribute_***
 
     define a PCG attribute, support float, int, vectors, transform, quaternion, object path, string etc.

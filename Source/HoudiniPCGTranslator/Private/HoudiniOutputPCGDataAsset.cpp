@@ -64,8 +64,6 @@ namespace HoudiniPCGDataOutputUtils
 	static bool HapiCreateNumericPCGAttribute(const int32& NodeId, const int32& PartId, HAPI_AttributeInfo& AttribInfo,
 		const std::string& AttribNameStr, GetAttribValueHapi GetAttribValueHapiFunc, TFunctionRef<ValueType(const TArray<HapiValueType>&, const int32&)> ConvertFunc,
 		UPCGMetadata* Metadata, const FName& AttribName, const ValueType& DefaultValue, TArray<PCGMetadataEntryKey>& EntryKeys);
-
-	static int32 GetSplineAttributeElemIdx(const HAPI_AttributeOwner& AttribOwner, const int32& VtxIdx, const int32& CurveIdx);
 }
 
 template<typename HapiValueType, typename ValueType, typename GetAttribValueHapi>
@@ -114,25 +112,12 @@ static bool HoudiniPCGDataOutputUtils::HapiCreateNumericPCGAttribute(const int32
 	return true;
 }
 
-static int32 HoudiniPCGDataOutputUtils::GetSplineAttributeElemIdx(const HAPI_AttributeOwner& AttribOwner, const int32& VtxIdx, const int32& CurveIdx)
-{
-	switch (AttribOwner)
-	{
-	case HAPI_ATTROWNER_VERTEX:
-	case HAPI_ATTROWNER_POINT: return VtxIdx;
-	case HAPI_ATTROWNER_PRIM: return CurveIdx;
-	case HAPI_ATTROWNER_DETAIL: return 0;
-	}
-
-	return -1;
-}
-
 using namespace HoudiniPCGDataOutputUtils;
 
 
 bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const FString& OutputName, const HAPI_GeoInfo& GeoInfo, const TArray<HAPI_PartInfo>& PartInfos)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniPCGDataOutputUtils);
+	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniOutputPCGDataAsset);
 
 	const int32& NodeId = GeoInfo.nodeId;
 
@@ -590,25 +575,25 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 					Point.Position = FVector(PositionData[VtxIdx * 3], PositionData[VtxIdx * 3 + 2], PositionData[VtxIdx * 3 + 1]) * POSITION_SCALE_TO_UNREAL;
 					if (!Rots.IsEmpty())
 					{
-						Point.Rotation = Rots[GetSplineAttributeElemIdx(RotOwner, VtxIdx, CurveIdx)].Rotator();
+						Point.Rotation = Rots[FHoudiniOutputUtils::CurveAttributeEntryIdx(RotOwner, VtxIdx, CurveIdx)].Rotator();
 					}
 					if (!ScaleData.IsEmpty())
 					{
-						const int32 ValueIdx = GetSplineAttributeElemIdx(ScaleOwner, VtxIdx, CurveIdx) * 3;
+						const int32 ValueIdx = FHoudiniOutputUtils::CurveAttributeEntryIdx(ScaleOwner, VtxIdx, CurveIdx) * 3;
 						Point.Scale = FVector(ScaleData[ValueIdx], ScaleData[ValueIdx + 2], ScaleData[ValueIdx + 1]);
 					}
 					if (!ArriveTangentData.IsEmpty())
 					{
-						const int32 ValueIdx = GetSplineAttributeElemIdx(ArriveTangentOwner, VtxIdx, CurveIdx) * 3;
+						const int32 ValueIdx = FHoudiniOutputUtils::CurveAttributeEntryIdx(ArriveTangentOwner, VtxIdx, CurveIdx) * 3;
 						Point.ArriveTangent = FVector(ArriveTangentData[ValueIdx], ArriveTangentData[ValueIdx + 2], ArriveTangentData[ValueIdx + 1]) * POSITION_SCALE_TO_UNREAL;
 					}
 					if (!LeaveTangentData.IsEmpty())
 					{
-						const int32 ValueIdx = GetSplineAttributeElemIdx(LeaveTangentOwner, VtxIdx, CurveIdx) * 3;
+						const int32 ValueIdx = FHoudiniOutputUtils::CurveAttributeEntryIdx(LeaveTangentOwner, VtxIdx, CurveIdx) * 3;
 						Point.LeaveTangent = FVector(LeaveTangentData[ValueIdx], LeaveTangentData[ValueIdx + 2], LeaveTangentData[ValueIdx + 1]) * POSITION_SCALE_TO_UNREAL;
 					}
 					Point.Type = (ArriveTangentData.IsEmpty() || LeaveTangentData.IsEmpty()) ?
-						((!CurveTypeData.IsEmpty() && (CurveTypeData[GetSplineAttributeElemIdx(CurveTypeOwner, VtxIdx, CurveIdx)] <= 0)) ?
+						((!CurveTypeData.IsEmpty() && (CurveTypeData[FHoudiniOutputUtils::CurveAttributeEntryIdx(CurveTypeOwner, VtxIdx, CurveIdx)] <= 0)) ?
 							ESplinePointType::Linear : ESplinePointType::Curve) : ESplinePointType::CurveCustomTangent;
 
 					SplineData->SplineStruct.AddPoint(Point, false);
@@ -616,7 +601,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 
 				if (!CurveClosedData.IsEmpty())
 				{
-					SplineData->SplineStruct.bClosedLoop = bool(CurveClosedData[GetSplineAttributeElemIdx(CurveClosedOwner, CurrVtxIdx, CurveIdx)]);
+					SplineData->SplineStruct.bClosedLoop = bool(CurveClosedData[FHoudiniOutputUtils::CurveAttributeEntryIdx(CurveClosedOwner, CurrVtxIdx, CurveIdx)]);
 				}
 				SplineData->SplineStruct.UpdateSpline();
 				SplineData->SplineStruct.Bounds = SplineData->SplineStruct.GetBounds();

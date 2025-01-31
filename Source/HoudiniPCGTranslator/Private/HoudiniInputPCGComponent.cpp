@@ -191,7 +191,7 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniInputPCGData);
 
-	// TODO: should use my shared memory input API like other input translators in my houdini engine, since the performance of HAPI is NOT ideal
+	// TODO: should use my shared memory input API like other input translators in my houdini engine, to import data faster
 
 
 	HAPI_AttributeInfo AttribInfo;
@@ -208,7 +208,9 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 			if (bCreateNewNode)
 				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CreateNode(FHoudiniEngine::Get().GetSession(), Input->GetGeoNodeId(), "null",
 					TCHAR_TO_UTF8(*FString::Printf(TEXT("%s_%s_%08X"), *InputObject->GetName(), *TaggedData.Data->GetName(), FPlatformTime::Cycles())),
-					false, &NodeId));
+					false, &NodeId))
+			//else
+			//	HAPI_SESSION_FAIL_RETURN(FHoudiniApi::RevertGeo(FHoudiniEngine::Get().GetSession(), NodeId));  // Why this can NOT revert geo after next commit?
 
 			{
 				TArray<float> PosData; PosData.SetNumUninitialized(Points.Num() * 3);
@@ -453,7 +455,9 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 			if (bCreateNewNode)
 				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CreateNode(FHoudiniEngine::Get().GetSession(), Input->GetGeoNodeId(), "null",
 					TCHAR_TO_UTF8(*FString::Printf(TEXT("%s_%s_%08X"), *InputObject->GetName(), *TaggedData.Data->GetName(), FPlatformTime::Cycles())),
-					false, &NodeId));
+					false, &NodeId))
+			//else
+			//	HAPI_SESSION_FAIL_RETURN(FHoudiniApi::RevertGeo(FHoudiniEngine::Get().GetSession(), NodeId));  // Why this can NOT revert geo after next commit?
 
 			const FTransform& Transform = SplineData->SplineStruct.Transform;
 			
@@ -610,7 +614,9 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 			if (bCreateNewNode)
 				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CreateNode(FHoudiniEngine::Get().GetSession(), Input->GetGeoNodeId(), "null",
 					TCHAR_TO_UTF8(*FString::Printf(TEXT("%s_%s_%08X"), *InputObject->GetName(), *TaggedData.Data->GetName(), FPlatformTime::Cycles())),
-					false, &NodeId));
+					false, &NodeId))
+			//else
+			//	HAPI_SESSION_FAIL_RETURN(FHoudiniApi::RevertGeo(FHoudiniEngine::Get().GetSession(), NodeId));  // Why this can NOT revert geo after next commit?
 
 			HAPI_PartInfo PartInfo;
 			FHoudiniApi::PartInfo_Init(&PartInfo);
