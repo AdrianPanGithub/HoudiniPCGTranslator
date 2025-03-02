@@ -186,7 +186,7 @@ static bool HoudiniPCGDataInputUtils::HapiUploadNumericAttribValue(const UPCGMet
 
 using namespace HoudiniPCGDataInputUtils;
 
-bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UObject* InputObject,
+bool FHoudiniPCGComponentInput::HapiRetrieveData(UHoudiniInput* Input, const UObject* InputObject,
 	const FPCGDataCollection& Data, TArray<int32>& InOutNodeIds, int32& InOutDataIdx)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniInputPCGData);
@@ -340,8 +340,8 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 						FHoudiniApi::SetAttributeIntUniqueData, FHoudiniApi::SetAttributeIntData)) return false;
 					break;
 				case EPCGMetadataTypes::Integer64:
-					if (!HapiUploadNumericAttribValue<int64, int64, 1, HAPI_STORAGETYPE_INT64, HAPI_ATTRIBUTE_TYPE_NONE>(
-						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const int64& SrcValue, TArray<int64>& DstValues) { DstValues.Add(SrcValue); },
+					if (!HapiUploadNumericAttribValue<int64, HAPI_Int64, 1, HAPI_STORAGETYPE_INT64, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const int64& SrcValue, TArray<HAPI_Int64>& DstValues) { DstValues.Add(SrcValue); },
 						FHoudiniApi::SetAttributeInt64UniqueData, FHoudiniApi::SetAttributeInt64Data)) return false;
 					break;
 				case EPCGMetadataTypes::Vector2:
@@ -670,7 +670,7 @@ bool FHoudiniPCGComponentInput::HapiRetreiveData(UHoudiniInput* Input, const UOb
 					FaceCounts.GetData(), 0, FaceCounts.Num()));
 			}
 
-			// TODO: Retreive all attributes v@N, v@uv, s@unreal_material, etc.
+			// TODO: Retrieve all attributes v@N, v@uv, s@unreal_material, etc.
 
 			HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CommitGeo(FHoudiniEngine::Get().GetSession(), NodeId));
 			if (bCreateNewNode)
@@ -707,7 +707,7 @@ bool FHoudiniPCGComponentInputBuilder::HapiUpload(UHoudiniInput* Input, const bo
 	{
 		if (const UPCGComponent* PCGComp = Cast<UPCGComponent>(Components[CompIdx]))
 		{
-			HOUDINI_FAIL_RETURN(FHoudiniPCGComponentInput::HapiRetreiveData(Input,
+			HOUDINI_FAIL_RETURN(FHoudiniPCGComponentInput::HapiRetrieveData(Input,
 				PCGComp->GetOuter(), PCGComp->GetGeneratedGraphOutput(), NodeIds, NumDatas));
 		}
 	}

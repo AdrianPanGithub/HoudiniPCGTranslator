@@ -12,12 +12,12 @@ class FHoudiniPCGComponentInput : public FHoudiniComponentInput
 public:
 	TArray<int32> NodeIds;
 
-	virtual void Invalidate() const override {}  // Will then delete this, so we need NOT to empty NodeIds
+	virtual void Invalidate() const override {}  // Will then delete this, so we need NOT empty NodeIds
 
-	virtual bool HapiDestroy(UHoudiniInput* Input) const override;  // Will then delete this, so we need NOT to empty NodeIds
+	virtual bool HapiDestroy(UHoudiniInput* Input) const override;  // Will then delete this, so we need NOT empty NodeIds
 
 	// TODO: should use my shared memory input API like other input translators in my houdini engine, to import data faster
-	HOUDINIPCGTRANSLATOR_API static bool HapiRetreiveData(UHoudiniInput* Input, const UObject* InputObject,
+	HOUDINIPCGTRANSLATOR_API static bool HapiRetrieveData(UHoudiniInput* Input, const UObject* InputObject,
 		const FPCGDataCollection& Data, TArray<int32>& InOutNodeIds, int32& InOutDataIdx);
 };
 

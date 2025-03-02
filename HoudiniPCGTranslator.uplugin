@@ -12,7 +12,7 @@
 	"SupportURL": "",
 	"CanContainContent": true,
 	"SupportedTargetPlatforms": [
-		"Win64"
+		"Win64", "Mac"
 	],
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
@@ -23,7 +23,7 @@
 			"Type": "Editor",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
-				"Win64"
+				"Win64", "Mac"
 			]
 		}
 	],

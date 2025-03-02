@@ -12,9 +12,9 @@
 #include "PCGDataAsset.h"
 
 
-void FHoudiniPCGDataAssetInputBuilder::AppendAllowClasses(TArray<const UClass*>& InOutAllowclasses)
+void FHoudiniPCGDataAssetInputBuilder::AppendAllowClasses(TArray<const UClass*>& InOutAllowClasses)
 {
-	InOutAllowclasses.Add(UPCGDataAsset::StaticClass());
+	InOutAllowClasses.Add(UPCGDataAsset::StaticClass());
 }
 
 UHoudiniInputHolder* FHoudiniPCGDataAssetInputBuilder::CreateOrUpdate(UHoudiniInput* Input, UObject* Asset, UHoudiniInputHolder* OldHolder)
@@ -48,7 +48,7 @@ bool UHoudiniInputPCGDataAsset::HapiUpload()
 		return HapiDestroy();
 
 	int32 NumDatas = 0;
-	HOUDINI_FAIL_RETURN(FHoudiniPCGComponentInput::HapiRetreiveData(GetInput(), PCGDA, PCGDA->Data, NodeIds, NumDatas));
+	HOUDINI_FAIL_RETURN(FHoudiniPCGComponentInput::HapiRetrieveData(GetInput(), PCGDA, PCGDA->Data, NodeIds, NumDatas));
 
 	for (int32 NodeIdx = NodeIds.Num() - 1; NodeIdx >= NumDatas; --NodeIdx)
 	{

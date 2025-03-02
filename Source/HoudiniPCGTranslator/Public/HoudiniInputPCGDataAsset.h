@@ -25,7 +25,7 @@ public:
 
 	virtual TSoftObjectPtr<UObject> GetObject() const override;
 
-	virtual bool IsObjectExists() const;
+	virtual bool IsObjectExists() const override;
 
 	virtual bool HapiUpload() override;
 
@@ -37,7 +37,7 @@ public:
 class FHoudiniPCGDataAssetInputBuilder : public IHoudiniContentInputBuilder
 {
 public:
-	virtual void AppendAllowClasses(TArray<const UClass*>& InOutAllowclasses) override;
+	virtual void AppendAllowClasses(TArray<const UClass*>& InOutAllowClasses) override;
 
 	virtual UHoudiniInputHolder* CreateOrUpdate(UHoudiniInput* Input, UObject* Asset, UHoudiniInputHolder* OldHolder) override;
 

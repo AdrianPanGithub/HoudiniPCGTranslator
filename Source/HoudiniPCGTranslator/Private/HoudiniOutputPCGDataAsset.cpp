@@ -230,7 +230,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 				AttribIdx < PartInfo.attributeCounts[HAPI_ATTROWNER_VERTEX] + PartInfo.attributeCounts[HAPI_ATTROWNER_POINT]; ++AttribIdx)
 			{
 				const std::string& AttribNameStr = AttribNames[AttribIdx];
-				if (AttribNameStr._Starts_with(HAPI_ATTRIB_PREFIX_UNREAL_PCG_ATTRIBUTE))
+				if (AttribNameStr.starts_with(HAPI_ATTRIB_PREFIX_UNREAL_PCG_ATTRIBUTE))
 				{
 					const FName AttribName(AttribNameStr.c_str() + strlen(HAPI_ATTRIB_PREFIX_UNREAL_PCG_ATTRIBUTE));
 					if (AttribName.IsNone())
@@ -247,19 +247,19 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 						switch (AttribInfo.tupleSize)
 						{
 						case 1: if (!HapiCreateNumericPCGAttribute<int32, int32>(NodeId, PartId, AttribInfo,
-							AttribNameStr, FHoudiniApi::GetAttributeIntData, PointData->Metadata, AttribName, 0, EntryKeys)) return false; break;
+							AttribNameStr, FHoudiniApi::GetAttributeIntData, PointData->Metadata, AttribName, 0, EntryKeys)) { return false; } break;
 						case 2: if (!HapiCreateNumericPCGAttribute<int32, FVector2d>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeIntData,
 							[](const TArray<int32>& Data, const int32& ValueIdx) { return FVector2d(Data[ValueIdx], Data[ValueIdx + 1]); },
-							PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) return false; break;
+							PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) { return false; } break;
 						case 3: if (!HapiCreateNumericPCGAttribute<int32, FVector>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeIntData,
 							[](const TArray<int32>& Data, const int32& ValueIdx) { return FVector(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2]); },
-							PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) return false; break;
+							PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) { return false; } break;
 						case 4: if (!HapiCreateNumericPCGAttribute<int32, FVector4>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeIntData,
 							[](const TArray<int32>& Data, const int32& ValueIdx) { return FVector4(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2], Data[ValueIdx + 3]); },
-							PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) return false; break;
+							PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) { return false; } break;
 						}
 					}
 					break;
@@ -267,20 +267,20 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 					{
 						switch (AttribInfo.tupleSize)
 						{
-						case 1: if (!HapiCreateNumericPCGAttribute<int64, int64>(NodeId, PartId, AttribInfo,
-							AttribNameStr, FHoudiniApi::GetAttributeInt64Data, PointData->Metadata, AttribName, 0, EntryKeys)) return false; break;
-						case 2: if (!HapiCreateNumericPCGAttribute<int64, FVector2d>(NodeId, PartId, AttribInfo,
+						case 1: if (!HapiCreateNumericPCGAttribute<HAPI_Int64, int64>(NodeId, PartId, AttribInfo,
+							AttribNameStr, FHoudiniApi::GetAttributeInt64Data, PointData->Metadata, AttribName, 0, EntryKeys)) { return false; } break;
+						case 2: if (!HapiCreateNumericPCGAttribute<HAPI_Int64, FVector2d>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeInt64Data,
-							[](const TArray<int64>& Data, const int32& ValueIdx) { return FVector2d(Data[ValueIdx], Data[ValueIdx + 1]); },
-							PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) return false; break;
-						case 3: if (!HapiCreateNumericPCGAttribute<int64, FVector>(NodeId, PartId, AttribInfo,
+							[](const TArray<HAPI_Int64>& Data, const int32& ValueIdx) { return FVector2d(Data[ValueIdx], Data[ValueIdx + 1]); },
+							PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) { return false; } break;
+						case 3: if (!HapiCreateNumericPCGAttribute<HAPI_Int64, FVector>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeInt64Data,
-							[](const TArray<int64>& Data, const int32& ValueIdx) { return FVector(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2]); },
-							PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) return false; break;
-						case 4: if (!HapiCreateNumericPCGAttribute<int64, FVector4>(NodeId, PartId, AttribInfo,
+							[](const TArray<HAPI_Int64>& Data, const int32& ValueIdx) { return FVector(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2]); },
+							PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) { return false; } break;
+						case 4: if (!HapiCreateNumericPCGAttribute<HAPI_Int64, FVector4>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeInt64Data,
-							[](const TArray<int64>& Data, const int32& ValueIdx) { return FVector4(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2], Data[ValueIdx + 3]); },
-							PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) return false; break;
+							[](const TArray<HAPI_Int64>& Data, const int32& ValueIdx) { return FVector4(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2], Data[ValueIdx + 3]); },
+							PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) { return false; } break;
 						}
 					}
 					break;
@@ -289,11 +289,11 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 						switch (AttribInfo.tupleSize)
 						{
 						case 1: if (!HapiCreateNumericPCGAttribute<float, float>(NodeId, PartId, AttribInfo,
-							AttribNameStr, FHoudiniApi::GetAttributeFloatData, PointData->Metadata, AttribName, 0, EntryKeys)) return false; break;
+							AttribNameStr, FHoudiniApi::GetAttributeFloatData, PointData->Metadata, AttribName, 0, EntryKeys)) { return false; } break;
 						case 2: if (!HapiCreateNumericPCGAttribute<float, FVector2d>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeFloatData,
 							[](const TArray<float>& Data, const int32& ValueIdx) { return FVector2d(Data[ValueIdx], Data[ValueIdx + 1]); },
-							PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) return false; break;
+							PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) { return false; } break;
 						case 3:
 						{
 							switch (AttribInfo.typeInfo)
@@ -301,11 +301,11 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 							case HAPI_ATTRIBUTE_TYPE_POINT: if (!HapiCreateNumericPCGAttribute<float, FVector>(NodeId, PartId, AttribInfo,
 									AttribNameStr, FHoudiniApi::GetAttributeFloatData,
 									[](const TArray<float>& Data, const int32& ValueIdx) { return FVector(Data[ValueIdx], Data[ValueIdx + 2], Data[ValueIdx + 1]) * POSITION_SCALE_TO_UNREAL; },
-									PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) return false; break;
+									PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) { return false; } break;
 							default: if (!HapiCreateNumericPCGAttribute<float, FVector>(NodeId, PartId, AttribInfo,
 								AttribNameStr, FHoudiniApi::GetAttributeFloatData,
 								[](const TArray<float>& Data, const int32& ValueIdx) { return FVector(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2]); },
-								PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) return false; break;
+								PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) { return false; } break;
 							}
 						}
 						break;
@@ -316,11 +316,11 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 							case HAPI_ATTRIBUTE_TYPE_QUATERNION: if (!HapiCreateNumericPCGAttribute<float, FQuat>(NodeId, PartId, AttribInfo,
 								AttribNameStr, FHoudiniApi::GetAttributeFloatData,
 								[](const TArray<float>& Data, const int32& ValueIdx) { return FQuat(Data[ValueIdx], Data[ValueIdx + 2], Data[ValueIdx + 1], -Data[ValueIdx + 3]); },
-								PointData->Metadata, AttribName, FQuat::Identity, EntryKeys)) return false; break;
+								PointData->Metadata, AttribName, FQuat::Identity, EntryKeys)) { return false; } break;
 							default: if (!HapiCreateNumericPCGAttribute<float, FVector4>(NodeId, PartId, AttribInfo,
 								AttribNameStr, FHoudiniApi::GetAttributeFloatData,
 								[](const TArray<float>& Data, const int32& ValueIdx) { return FVector4(Data[ValueIdx], Data[ValueIdx + 1], Data[ValueIdx + 2], Data[ValueIdx + 3]); },
-								PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) return false; break;
+								PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) { return false; } break;
 							}
 						}
 						break;
@@ -352,7 +352,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 								HoudiniXform.M[3][3] = UnrealXform.M[3][3];
 								return FTransform(FTransform3f(HoudiniXform));
 							},
-							PointData->Metadata, AttribName, FTransform::Identity, EntryKeys)) return false; break;
+							PointData->Metadata, AttribName, FTransform::Identity, EntryKeys)) { return false; } break;
 						}
 					}
 					break;
@@ -361,13 +361,13 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 						switch (AttribInfo.tupleSize)
 						{
 						case 1: if (!HapiCreateNumericPCGAttribute<double, double>(NodeId, PartId, AttribInfo,
-							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, 0.0, EntryKeys)) return false; break;
+							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, 0.0, EntryKeys)) { return false; } break;
 						case 2: if (!HapiCreateNumericPCGAttribute<double, FVector2d>(NodeId, PartId, AttribInfo,
-							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) return false; break;
+							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, FVector2d::ZeroVector, EntryKeys)) { return false; } break;
 						case 3: if (!HapiCreateNumericPCGAttribute<double, FVector>(NodeId, PartId, AttribInfo,
-							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) return false; break;
+							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, FVector::ZeroVector, EntryKeys)) { return false; } break;
 						case 4: if (!HapiCreateNumericPCGAttribute<double, FVector4>(NodeId, PartId, AttribInfo,
-							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) return false; break;
+							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data, PointData->Metadata, AttribName, FVector4::Zero(), EntryKeys)) { return false; } break;
 						case 16: if (!HapiCreateNumericPCGAttribute<double, FTransform>(NodeId, PartId, AttribInfo,
 							AttribNameStr, FHoudiniApi::GetAttributeFloat64Data,
 							[](const TArray<double>& Data, const int32& ValueIdx)
@@ -396,7 +396,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 								HoudiniXform.M[3][3] = UnrealXform.M[3][3];
 								return FTransform(HoudiniXform);
 							},
-							PointData->Metadata, AttribName, FTransform::Identity, EntryKeys)) return false; break;
+							PointData->Metadata, AttribName, FTransform::Identity, EntryKeys)) { return false; } break;
 						}
 					}
 					break;
@@ -453,7 +453,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 						if (!HapiCreateNumericPCGAttribute<uint8, bool>(NodeId, PartId, AttribInfo,
 						AttribNameStr, FHoudiniApi::GetAttributeUInt8Data,
 						[](const TArray<uint8>& Data, const int32& ValueIdx) { return bool(Data[ValueIdx]); },
-						PointData->Metadata, AttribName, false, EntryKeys)) return false;
+						PointData->Metadata, AttribName, false, EntryKeys)) { return false; }
 					}
 					break;
 					case HAPI_STORAGETYPE_INT8: if (AttribInfo.tupleSize == 1)
@@ -461,7 +461,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 						if (!HapiCreateNumericPCGAttribute<int8, bool>(NodeId, PartId, AttribInfo,
 						AttribNameStr, FHoudiniApi::GetAttributeInt8Data,
 						[](const TArray<int8>& Data, const int32& ValueIdx) { return bool(Data[ValueIdx]); },
-						PointData->Metadata, AttribName, false, EntryKeys)) return false;
+						PointData->Metadata, AttribName, false, EntryKeys)) { return false; }
 					}
 					break;
 					case HAPI_STORAGETYPE_INT16: if (AttribInfo.tupleSize == 1)
@@ -469,7 +469,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 						if (!HapiCreateNumericPCGAttribute<int16, int32>(NodeId, PartId, AttribInfo,
 						AttribNameStr, FHoudiniApi::GetAttributeInt16Data,
 						[](const TArray<int16>& Data, const int32& ValueIdx) { return int32(Data[ValueIdx]); },
-						PointData->Metadata, AttribName, false, EntryKeys)) return false;
+						PointData->Metadata, AttribName, false, EntryKeys)) { return false; }
 					}
 					break;
 					case HAPI_STORAGETYPE_DICTIONARY:
@@ -512,8 +512,8 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetAttributeInfo(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
 					HAPI_ATTRIB_ROT, RotOwner, &AttribInfo));
 
-				if (AttribInfo.storage == HAPI_STORAGETYPE_FLOAT || AttribInfo.storage == HAPI_STORAGETYPE_FLOAT64 &&
-					AttribInfo.tupleSize == 3 || AttribInfo.tupleSize == 4)
+				if (((AttribInfo.storage == HAPI_STORAGETYPE_FLOAT) || (AttribInfo.storage == HAPI_STORAGETYPE_FLOAT64)) &&
+					((AttribInfo.tupleSize == 3) || (AttribInfo.tupleSize == 4)))
 				{
 					TArray<float> RotData;
 					RotData.SetNumUninitialized(AttribInfo.count * AttribInfo.tupleSize);
@@ -550,9 +550,9 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 			TArray<float> ArriveTangentData;
 			HOUDINI_FAIL_RETURN(FHoudiniEngineUtils::HapiGetFloatAttributeData(NodeId, PartId, HAPI_ATTRIB_UNREAL_SPLINE_POINT_ARRIVE_TANGENT, 3, ArriveTangentData, ArriveTangentOwner));
 
-			HAPI_AttributeOwner LeaveTangentOwner = FHoudiniEngineUtils::QueryAttributeOwner(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_SPLINE_POINT_ARRIVE_TANGENT);
+			HAPI_AttributeOwner LeaveTangentOwner = FHoudiniEngineUtils::QueryAttributeOwner(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_SPLINE_POINT_LEAVE_TANGENT);
 			TArray<float> LeaveTangentData;
-			HOUDINI_FAIL_RETURN(FHoudiniEngineUtils::HapiGetFloatAttributeData(NodeId, PartId, HAPI_ATTRIB_UNREAL_SPLINE_POINT_ARRIVE_TANGENT, 3, LeaveTangentData, LeaveTangentOwner));
+			HOUDINI_FAIL_RETURN(FHoudiniEngineUtils::HapiGetFloatAttributeData(NodeId, PartId, HAPI_ATTRIB_UNREAL_SPLINE_POINT_LEAVE_TANGENT, 3, LeaveTangentData, LeaveTangentOwner));
 
 			// If has spline point tangents, then we just set to use ESplinePointType::CurveCustomTangent
 			HAPI_AttributeOwner CurveTypeOwner = (!ArriveTangentData.IsEmpty() && !LeaveTangentData.IsEmpty()) ? HAPI_ATTROWNER_INVALID :
