@@ -576,6 +576,30 @@ bool FHoudiniPCGComponentInput::HapiRetrieveData(UHoudiniInput* Input, const UOb
 					HAPI_ATTRIB_SCALE, &AttribInfo, ScaleData.GetData(), 0, AttribInfo.count));
 			}
 
+			{
+				AttribInfo.tupleSize = 1;
+				AttribInfo.storage = HAPI_STORAGETYPE_STRING_ARRAY;
+				AttribInfo.owner = HAPI_ATTROWNER_PRIM;
+				AttribInfo.count = PartInfo.faceCount;
+				AttribInfo.totalArrayElements = TaggedData.Tags.Num();
+				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+					HAPI_ATTRIB_UNREAL_PCG_TAGS, &AttribInfo));
+
+				static const char* SpareStr = "";
+				TArray<std::string> TagStrs;
+				for (const FString& Tag : TaggedData.Tags)
+					TagStrs.Add(TCHAR_TO_UTF8(*Tag));
+				TArray<const char*> Tags;
+				for (const std::string& TagStr : TagStrs)
+					Tags.Add(TagStr.c_str());
+
+				const int NumTags = Tags.Num();
+				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeStringArrayData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+					HAPI_ATTRIB_UNREAL_PCG_TAGS, &AttribInfo, Tags.IsEmpty() ? &SpareStr : Tags.GetData(), NumTags, &NumTags, 0, 1));
+
+				AttribInfo.totalArrayElements = 0;
+			}
+
 			if (!InputObject->IsA<AActor>())  // s@unreal_object_path
 			{
 				AttribInfo.tupleSize = 1;

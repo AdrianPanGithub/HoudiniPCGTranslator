@@ -64,6 +64,8 @@ namespace HoudiniPCGDataOutputUtils
 	static bool HapiCreateNumericPCGAttribute(const int32& NodeId, const int32& PartId, HAPI_AttributeInfo& AttribInfo,
 		const std::string& AttribNameStr, GetAttribValueHapi GetAttribValueHapiFunc, TFunctionRef<ValueType(const TArray<HapiValueType>&, const int32&)> ConvertFunc,
 		UPCGMetadata* Metadata, const FName& AttribName, const ValueType& DefaultValue, TArray<PCGMetadataEntryKey>& EntryKeys);
+
+	static bool HapiGetTags(const int32& NodeId, const int32& PartId, const HAPI_AttributeOwner& TagsOwner, TSet<FString>& OutTags);
 }
 
 template<typename HapiValueType, typename ValueType, typename GetAttribValueHapi>
@@ -112,6 +114,46 @@ static bool HoudiniPCGDataOutputUtils::HapiCreateNumericPCGAttribute(const int32
 	return true;
 }
 
+static bool HoudiniPCGDataOutputUtils::HapiGetTags(const int32& NodeId, const int32& PartId, const HAPI_AttributeOwner& TagsOwner, TSet<FString>& OutTags)
+{
+	if (TagsOwner != HAPI_ATTROWNER_INVALID)
+	{
+		HAPI_AttributeInfo AttribInfo;
+		HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetAttributeInfo(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+			HAPI_ATTRIB_UNREAL_PCG_TAGS, TagsOwner, &AttribInfo));
+
+		if (AttribInfo.exists && FHoudiniEngineUtils::ConvertStorageType(AttribInfo.storage) == EHoudiniStorageType::String)
+		{
+			if (FHoudiniEngineUtils::IsArray(AttribInfo.storage))
+			{
+				if (AttribInfo.totalArrayElements >= 1)
+				{
+					TArray<HAPI_StringHandle> SHs;
+					SHs.SetNumUninitialized(AttribInfo.totalArrayElements);
+					int ArrayLen = 0;
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetAttributeStringArrayData(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+						HAPI_ATTRIB_UNREAL_PCG_TAGS, &AttribInfo, SHs.GetData(), AttribInfo.totalArrayElements, &ArrayLen, 0, 1));
+					SHs.SetNum(ArrayLen);
+					TArray<FString> Tags;
+					HOUDINI_FAIL_RETURN(FHoudiniEngineUtils::HapiConvertStringHandles(SHs, Tags));
+					OutTags = TSet<FString>(Tags);
+				}
+			}
+			else
+			{
+				HAPI_StringHandle SH = 0;
+				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetAttributeStringData(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+					HAPI_ATTRIB_UNREAL_PCG_TAGS, &AttribInfo, &SH, 0, 1));
+				FString Tag;
+				FHoudiniEngineUtils::HapiConvertStringHandle(SH, Tag);
+				if (!Tag.IsEmpty())
+					OutTags.Add(Tag);
+			}
+		}
+	}
+	return true;
+}
+
 using namespace HoudiniPCGDataOutputUtils;
 
 
@@ -148,6 +190,9 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 			FPCGTaggedData TaggedData;
 			UPCGPointData* PointData = NewObject<UPCGPointData>(PCGDA);
 			TaggedData.Data = PointData;
+
+			HOUDINI_FAIL_RETURN(HapiGetTags(NodeId, PartId,
+				FHoudiniEngineUtils::QueryAttributeOwner(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_PCG_TAGS), TaggedData.Tags));
 
 			const int32& PointCount = PartInfo.pointCount;
 
@@ -489,6 +534,25 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 		{
 			HAPI_AttributeInfo AttribInfo;
 
+			TSharedPtr<FHoudiniAttribute> TagsAttrib;
+			{  // unreal_pcg_tags
+				// Prefer on prim
+				const HAPI_AttributeOwner TagsOwner = FHoudiniEngineUtils::IsAttributeExists(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_PCG_TAGS, HAPI_ATTROWNER_PRIM) ?
+					HAPI_ATTROWNER_PRIM : FHoudiniEngineUtils::QueryAttributeOwner(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_PCG_TAGS);
+				if (TagsOwner != HAPI_ATTROWNER_INVALID)
+				{
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetAttributeInfo(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+						HAPI_ATTRIB_UNREAL_PCG_TAGS, TagsOwner, &AttribInfo));
+					if (AttribInfo.exists)
+					{
+						TagsAttrib = FHoudiniEngineUtils::IsArray(AttribInfo.storage) ?
+							MakeShared<FHoudiniArrayAttribute>(TEXT("")) : MakeShared<FHoudiniAttribute>(TEXT(""));
+
+						HOUDINI_FAIL_RETURN(TagsAttrib->HapiRetrieveData(NodeId, PartId, HAPI_ATTRIB_UNREAL_PCG_TAGS, AttribInfo));
+					}
+				}
+			}
+
 			// -------- Retrieve vertex list --------
 			TArray<int32> CurveCounts;
 			CurveCounts.SetNumUninitialized(PartInfo.faceCount);
@@ -568,6 +632,18 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 				UPCGSplineData* SplineData = NewObject<UPCGSplineData>(PCGDA);
 				TaggedData.Data = SplineData;
 
+				if (TagsAttrib.IsValid())
+				{
+					TArray<FString> Tags = TagsAttrib->GetStringData(FHoudiniOutputUtils::CurveAttributeEntryIdx(TagsAttrib->GetOwner(), CurrVtxIdx, CurveIdx));
+					if (!Tags.IsEmpty())
+					{
+						if (FHoudiniEngineUtils::IsArray(TagsAttrib->GetStorage()))
+							TaggedData.Tags = TSet<FString>(Tags);
+						else if (!Tags[0].IsEmpty())
+							TaggedData.Tags.Add(Tags[0]);
+					}
+				}
+
 				for (int32 VtxIdx = CurrVtxIdx; VtxIdx < CurrVtxIdx + VertexCount; ++VtxIdx)
 				{
 					FSplinePoint Point;
@@ -621,6 +697,9 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 			FPCGTaggedData TaggedData;
 			UPCGDynamicMeshData* DMData = NewObject<UPCGDynamicMeshData>(PCGDA);
 			TaggedData.Data = DMData;
+
+			HOUDINI_FAIL_RETURN(HapiGetTags(NodeId, PartId, FHoudiniEngineUtils::IsAttributeExists(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_PCG_TAGS, HAPI_ATTROWNER_PRIM) ?
+				HAPI_ATTROWNER_PRIM : FHoudiniEngineUtils::QueryAttributeOwner(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_PCG_TAGS), TaggedData.Tags));
 
 			HAPI_AttributeInfo AttribInfo;
 

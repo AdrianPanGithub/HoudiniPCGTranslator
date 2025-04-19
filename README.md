@@ -35,6 +35,9 @@ i@**unreal_output_pcg_data_asset**
 @**unreal_pcg_attribute_***
 
     define a PCG attribute, support float, int, vectors, transform, quaternion, object path, string, etc.
+s[]@**unreal_pcg_tags**
+
+    Tags on PCGData, useful when output splines that tagged with building grammers. Could be either string or string array.
 s@**unreal_object_path**
 
     define where PCGDataAsset should be created at.
