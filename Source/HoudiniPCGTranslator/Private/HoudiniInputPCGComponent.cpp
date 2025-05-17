@@ -11,8 +11,11 @@
 
 #include "PCGComponent.h"
 #include "Data/PCGPointData.h"
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 6)) || (ENGINE_MAJOR_VERSION > 5)
+#include "Data/PCGPointArrayData.h"
+#endif
 #include "Data/PCGSplineData.h"
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 #include "Data/PCGDynamicMeshData.h"
 #include "UDynamicMesh.h"
 #endif
@@ -77,7 +80,7 @@ static bool HoudiniPCGDataInputUtils::HapiUploadStringAttribValue(const UPCGMeta
 		}
 		else
 		{
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 			TArray<const PCGMetadataEntryKey> EntryKeys;
 #else
 			TArray<PCGMetadataEntryKey> EntryKeys;
@@ -95,7 +98,7 @@ static bool HoudiniPCGDataInputUtils::HapiUploadStringAttribValue(const UPCGMeta
 				{
 					TArray<StrValueType> UniqueValues;
 					UniqueValues.SetNum(UniqueKeys.Num());
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 					Attrib->GetValues(UniqueKeys, UniqueValues);
 #else
 					for (int32 UniqueIdx = 0; UniqueIdx < UniqueKeys.Num(); ++UniqueIdx)
@@ -152,7 +155,7 @@ static bool HoudiniPCGDataInputUtils::HapiUploadNumericAttribValue(const UPCGMet
 		}
 		else
 		{
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 			TArray<const PCGMetadataEntryKey> EntryKeys;
 #else
 			TArray<PCGMetadataEntryKey> EntryKeys;
@@ -192,11 +195,276 @@ bool FHoudiniPCGComponentInput::HapiRetrieveData(UHoudiniInput* Input, const UOb
 	TRACE_CPUPROFILER_EVENT_SCOPE(HoudiniInputPCGData);
 
 	// TODO: should use my shared memory input API like other input translators in my houdini engine, to import data faster
-
+	// TODO: UE5.6 MetaData Domain
 
 	HAPI_AttributeInfo AttribInfo;
 	for (const FPCGTaggedData& TaggedData : Data.TaggedData)
 	{
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 6)) || (ENGINE_MAJOR_VERSION > 5)
+		if (const UPCGPointArrayData* PointData = Cast<UPCGPointArrayData>(TaggedData.Data))
+		{
+			const int32 NumPoints = PointData->GetNumPoints();
+			if (NumPoints <= 0)
+				continue;
+
+			int32 NodeId = InOutNodeIds.IsValidIndex(InOutDataIdx) ? InOutNodeIds[InOutDataIdx] : -1;
+			const bool bCreateNewNode = (NodeId < 0);
+			if (bCreateNewNode)
+				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CreateNode(FHoudiniEngine::Get().GetSession(), Input->GetGeoNodeId(), "null",
+					TCHAR_TO_UTF8(*FString::Printf(TEXT("%s_%s_%08X"), *InputObject->GetName(), *TaggedData.Data->GetName(), FPlatformTime::Cycles())),
+					false, &NodeId))
+				//else
+				//	HAPI_SESSION_FAIL_RETURN(FHoudiniApi::RevertGeo(FHoudiniEngine::Get().GetSession(), NodeId));  // Why this can NOT revert geo after next commit?
+
+			{
+				TConstPCGValueRange<FTransform> Transforms = PointData->GetConstTransformValueRange();
+				TArray<float> PosData; if (!Transforms.IsEmpty()) PosData.SetNumUninitialized(NumPoints * 3); else PosData.SetNumZeroed(NumPoints * 3);
+				TArray<float> RotData; if (!Transforms.IsEmpty()) RotData.SetNumUninitialized(NumPoints * 4);
+				TArray<float> ScaleData; if (!Transforms.IsEmpty()) ScaleData.SetNumUninitialized(NumPoints * 3);
+				TConstPCGValueRange<float> Densities = PointData->GetConstDensityValueRange();
+				TArray<float> DensityData; if (!Densities.IsEmpty()) DensityData.SetNumUninitialized(NumPoints);
+				TConstPCGValueRange<FVector4> Colors = PointData->GetConstColorValueRange();
+				TArray<float> ColorData; if (!Colors.IsEmpty()) ColorData.SetNumUninitialized(NumPoints * 3);
+				TArray<float> AlphaData; if (!Colors.IsEmpty()) AlphaData.SetNumUninitialized(NumPoints);
+
+				for (int32 PointIdx = 0; PointIdx < NumPoints; ++PointIdx)
+				{
+					if (!Transforms.IsEmpty())
+					{
+						const FTransform& Transform = Transforms[PointIdx];
+						{
+							const FVector3f Pos = FVector3f(Transform.GetLocation() * POSITION_SCALE_TO_HOUDINI);
+							PosData[PointIdx * 3] = Pos.X; PosData[PointIdx * 3 + 1] = Pos.Z; PosData[PointIdx * 3 + 2] = Pos.Y;
+						}
+						{
+							const FQuat Rot = Transform.GetRotation();
+							RotData[PointIdx * 4] = Rot.X; RotData[PointIdx * 4 + 1] = Rot.Z; RotData[PointIdx * 4 + 2] = Rot.Y; RotData[PointIdx * 4 + 3] = -Rot.W;
+						}
+						{
+							const FVector Scale = Transform.GetScale3D();
+							ScaleData[PointIdx * 3] = Scale.X; ScaleData[PointIdx * 3 + 1] = Scale.Z; ScaleData[PointIdx * 3 + 2] = Scale.Y;
+						}
+					}
+					if (!Densities.IsEmpty())
+						DensityData[PointIdx] = Densities[PointIdx];
+					if (!Colors.IsEmpty())
+					{
+						const FVector4f Color = FVector4f(Colors[PointIdx]);
+						ColorData[PointIdx * 3] = Color.X; ColorData[PointIdx * 3 + 1] = Color.Y; ColorData[PointIdx * 3 + 2] = Color.Z;
+						AlphaData[PointIdx] = Color.W;
+					}
+				}
+
+				HAPI_PartInfo PartInfo;
+				FHoudiniApi::PartInfo_Init(&PartInfo);
+				PartInfo.type = HAPI_PARTTYPE_MESH;
+				PartInfo.pointCount = NumPoints;
+
+				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetPartInfo(FHoudiniEngine::Get().GetSession(), NodeId, 0, &PartInfo));
+				AttribInfo.count = PartInfo.pointCount;
+				AttribInfo.owner = HAPI_ATTROWNER_POINT;
+				{
+					// @P
+					AttribInfo.tupleSize = 3;
+					AttribInfo.storage = HAPI_STORAGETYPE_FLOAT;
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_POSITION, &AttribInfo));
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeFloatData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_POSITION, &AttribInfo, PosData.GetData(), 0, AttribInfo.count));
+				}
+				if (!RotData.IsEmpty())
+				{
+					// p@rot
+					AttribInfo.tupleSize = 4;
+					AttribInfo.storage = HAPI_STORAGETYPE_FLOAT;
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_ROT, &AttribInfo));
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeFloatData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_ROT, &AttribInfo, RotData.GetData(), 0, AttribInfo.count));
+				}
+				if (!ScaleData.IsEmpty())
+				{
+					// v@scale
+					AttribInfo.tupleSize = 3;
+					AttribInfo.storage = HAPI_STORAGETYPE_FLOAT;
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_SCALE, &AttribInfo));
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeFloatData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_SCALE, &AttribInfo, ScaleData.GetData(), 0, AttribInfo.count));
+				}
+				if (!DensityData.IsEmpty())
+				{
+					// f@density
+					AttribInfo.tupleSize = 1;
+					AttribInfo.storage = HAPI_STORAGETYPE_FLOAT;
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_DENSITY, &AttribInfo));
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeFloatData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_DENSITY, &AttribInfo, DensityData.GetData(), 0, AttribInfo.count));
+				}
+				if (!ColorData.IsEmpty())
+				{
+					// v@Cd
+					AttribInfo.tupleSize = 3;
+					AttribInfo.storage = HAPI_STORAGETYPE_FLOAT;
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_COLOR, &AttribInfo));
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeFloatData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ATTRIB_COLOR, &AttribInfo, ColorData.GetData(), 0, AttribInfo.count));
+				}
+				if (!AlphaData.IsEmpty())
+				{
+					// f@Alpha
+					AttribInfo.tupleSize = 1;
+					AttribInfo.storage = HAPI_STORAGETYPE_FLOAT;
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ALPHA, &AttribInfo));
+
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeFloatData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+						HAPI_ALPHA, &AttribInfo, AlphaData.GetData(), 0, AttribInfo.count));
+				}
+			}
+
+			TArray<FName> AttribNames;
+			TArray<EPCGMetadataTypes> AttribTypes;
+			PointData->Metadata->GetAttributes(AttribNames, AttribTypes);
+			for (int32 AttribIdx = 0; AttribIdx < AttribNames.Num(); ++AttribIdx)
+			{
+				const FName& AttribName = AttribNames[AttribIdx];
+				switch (AttribTypes[AttribIdx])
+				{
+				case EPCGMetadataTypes::Float:
+					if (!HapiUploadNumericAttribValue<float, float, 1, HAPI_STORAGETYPE_FLOAT, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const float& SrcValue, TArray<float>& DstValues) { DstValues.Add(SrcValue); },
+						FHoudiniApi::SetAttributeFloatUniqueData, FHoudiniApi::SetAttributeFloatData)) return false;
+					break;
+				case EPCGMetadataTypes::Double:
+					if (!HapiUploadNumericAttribValue<double, double, 1, HAPI_STORAGETYPE_FLOAT64, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const double& SrcValue, TArray<double>& DstValues) { DstValues.Add(SrcValue); },
+						FHoudiniApi::SetAttributeFloat64UniqueData, FHoudiniApi::SetAttributeFloat64Data)) return false;
+					break;
+				case EPCGMetadataTypes::Integer32:
+					if (!HapiUploadNumericAttribValue<int32, int, 1, HAPI_STORAGETYPE_INT, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const int32& SrcValue, TArray<int>& DstValues) { DstValues.Add(SrcValue); },
+						FHoudiniApi::SetAttributeIntUniqueData, FHoudiniApi::SetAttributeIntData)) return false;
+					break;
+				case EPCGMetadataTypes::Integer64:
+					if (!HapiUploadNumericAttribValue<int64, HAPI_Int64, 1, HAPI_STORAGETYPE_INT64, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const int64& SrcValue, TArray<HAPI_Int64>& DstValues) { DstValues.Add(SrcValue); },
+						FHoudiniApi::SetAttributeInt64UniqueData, FHoudiniApi::SetAttributeInt64Data)) return false;
+					break;
+				case EPCGMetadataTypes::Vector2:
+					if (!HapiUploadNumericAttribValue<FVector2d, float, 2, HAPI_STORAGETYPE_FLOAT, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const FVector2d& SrcValue, TArray<float>& DstValues) { DstValues.Add(SrcValue.X); DstValues.Add(SrcValue.Y); },
+						FHoudiniApi::SetAttributeFloatUniqueData, FHoudiniApi::SetAttributeFloatData)) return false;
+					break;
+				case EPCGMetadataTypes::Vector:
+					if (!HapiUploadNumericAttribValue<FVector, float, 3, HAPI_STORAGETYPE_FLOAT, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const FVector& SrcValue, TArray<float>& DstValues) { DstValues.Add(SrcValue.X); DstValues.Add(SrcValue.Y); DstValues.Add(SrcValue.Z); },
+						FHoudiniApi::SetAttributeFloatUniqueData, FHoudiniApi::SetAttributeFloatData)) return false;
+					break;
+				case EPCGMetadataTypes::Vector4:
+					if (!HapiUploadNumericAttribValue<FVector4, float, 4, HAPI_STORAGETYPE_FLOAT, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const FVector4& SrcValue, TArray<float>& DstValues) { DstValues.Add(SrcValue.X); DstValues.Add(SrcValue.Y); DstValues.Add(SrcValue.Z); DstValues.Add(SrcValue.W); },
+						FHoudiniApi::SetAttributeFloatUniqueData, FHoudiniApi::SetAttributeFloatData)) return false;
+					break;
+				case EPCGMetadataTypes::Quaternion:
+					if (!HapiUploadNumericAttribValue<FQuat, float, 4, HAPI_STORAGETYPE_FLOAT, HAPI_ATTRIBUTE_TYPE_QUATERNION>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const FQuat& SrcValue, TArray<float>& DstValues) { DstValues.Add(SrcValue.X); DstValues.Add(SrcValue.Z); DstValues.Add(SrcValue.Y); DstValues.Add(-SrcValue.W); },
+						FHoudiniApi::SetAttributeFloatUniqueData, FHoudiniApi::SetAttributeFloatData)) return false;
+					break;
+				case EPCGMetadataTypes::Transform:
+					if (!HapiUploadNumericAttribValue<FTransform, float, 16, HAPI_STORAGETYPE_FLOAT, HAPI_ATTRIBUTE_TYPE_MATRIX>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const FTransform& SrcValue, TArray<float>& DstValues)
+						{
+							const FMatrix44f UnrealXform = FMatrix44f(SrcValue.ToMatrixWithScale());
+
+							FMatrix44f HoudiniXform;
+							HoudiniXform.M[0][0] = UnrealXform.M[0][0];
+							HoudiniXform.M[0][1] = UnrealXform.M[0][2];
+							HoudiniXform.M[0][2] = UnrealXform.M[0][1];
+							HoudiniXform.M[0][3] = UnrealXform.M[0][3];
+
+							HoudiniXform.M[1][0] = UnrealXform.M[2][0];
+							HoudiniXform.M[1][1] = UnrealXform.M[2][2];
+							HoudiniXform.M[1][2] = UnrealXform.M[2][1];
+							HoudiniXform.M[1][3] = UnrealXform.M[2][3];
+
+							HoudiniXform.M[2][0] = UnrealXform.M[1][0];
+							HoudiniXform.M[2][1] = UnrealXform.M[1][2];
+							HoudiniXform.M[2][2] = UnrealXform.M[1][1];
+							HoudiniXform.M[2][3] = UnrealXform.M[1][3];
+
+							HoudiniXform.M[3][0] = UnrealXform.M[3][0] * POSITION_SCALE_TO_HOUDINI_F;
+							HoudiniXform.M[3][1] = UnrealXform.M[3][2] * POSITION_SCALE_TO_HOUDINI_F;
+							HoudiniXform.M[3][2] = UnrealXform.M[3][1] * POSITION_SCALE_TO_HOUDINI_F;
+							HoudiniXform.M[3][3] = UnrealXform.M[3][3];
+							DstValues.Append(&UnrealXform.M[0][0], 16);
+						},
+						FHoudiniApi::SetAttributeFloatUniqueData, FHoudiniApi::SetAttributeFloatData)) return false;
+					break;
+				case EPCGMetadataTypes::String:
+					HOUDINI_FAIL_RETURN(HapiUploadStringAttribValue<FString>(PointData->Metadata, AttribName, NodeId, AttribInfo,
+						[](const FString& Value) { return Value; }));
+					break;
+				case EPCGMetadataTypes::Boolean:
+					if (!HapiUploadNumericAttribValue<bool, uint8, 1, HAPI_STORAGETYPE_UINT8, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const bool& SrcValue, TArray<uint8>& DstValues) { DstValues.Add(uint8(SrcValue)); },
+						FHoudiniApi::SetAttributeUInt8UniqueData, FHoudiniApi::SetAttributeUInt8Data)) return false;
+					break;
+				case EPCGMetadataTypes::Rotator:
+					if (!HapiUploadNumericAttribValue<FRotator, float, 3, HAPI_STORAGETYPE_FLOAT, HAPI_ATTRIBUTE_TYPE_NONE>(
+						PointData->Metadata, AttribName, NodeId, AttribInfo, [](const FRotator& SrcValue, TArray<float>& DstValues) { DstValues.Add(SrcValue.Roll); DstValues.Add(SrcValue.Yaw); DstValues.Add(SrcValue.Pitch); },
+						FHoudiniApi::SetAttributeFloatUniqueData, FHoudiniApi::SetAttributeFloatData)) return false;
+					break;
+				case EPCGMetadataTypes::Name:
+					HOUDINI_FAIL_RETURN(HapiUploadStringAttribValue<FName>(PointData->Metadata, AttribName, NodeId, AttribInfo,
+						[](const FName& Value) { return Value.ToString(); }));
+					break;
+				case EPCGMetadataTypes::SoftObjectPath:
+					HOUDINI_FAIL_RETURN(HapiUploadStringAttribValue<FSoftObjectPath>(PointData->Metadata, AttribName, NodeId, AttribInfo,
+						[](const FSoftObjectPath& Value) { return Value.ToString(); }));
+					break;
+				case EPCGMetadataTypes::SoftClassPath:
+					HOUDINI_FAIL_RETURN(HapiUploadStringAttribValue<FSoftClassPath>(PointData->Metadata, AttribName, NodeId, AttribInfo,
+						[](const FSoftClassPath& Value) { return Value.ToString(); }));
+					break;
+				}
+			}
+
+			if (!InputObject->IsA<AActor>())  // s@unreal_object_path
+			{
+				AttribInfo.tupleSize = 1;
+				AttribInfo.storage = HAPI_STORAGETYPE_STRING;
+
+				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::AddAttribute(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+					HAPI_ATTRIB_UNREAL_OBJECT_PATH, &AttribInfo));
+
+				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::SetAttributeStringUniqueData(FHoudiniEngine::Get().GetSession(), NodeId, 0,
+					HAPI_ATTRIB_UNREAL_OBJECT_PATH, &AttribInfo, TCHAR_TO_UTF8(*FHoudiniEngineUtils::GetAssetReference(InputObject)), 1, 0, AttribInfo.count));
+			}
+
+			HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CommitGeo(FHoudiniEngine::Get().GetSession(), NodeId));
+			if (bCreateNewNode)
+			{
+				HOUDINI_FAIL_RETURN(Input->HapiConnectToMergeNode(NodeId));
+				InOutNodeIds.Add(NodeId);
+			}
+
+			++InOutDataIdx;
+		}
+#endif
 		if (const UPCGPointData* PointData = Cast<UPCGPointData>(TaggedData.Data))
 		{
 			const TArray<FPCGPoint>& Points = PointData->GetPoints();
@@ -460,9 +728,13 @@ bool FHoudiniPCGComponentInput::HapiRetrieveData(UHoudiniInput* Input, const UOb
 			//	HAPI_SESSION_FAIL_RETURN(FHoudiniApi::RevertGeo(FHoudiniEngine::Get().GetSession(), NodeId));  // Why this can NOT revert geo after next commit?
 
 			const FTransform& Transform = SplineData->SplineStruct.Transform;
-			
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 6)) || (ENGINE_MAJOR_VERSION > 5)
+			const TArray<FInterpCurvePointQuat>& Rots = SplineData->SplineStruct.GetSplinePointsRotation().Points;
+			const TArray<FInterpCurvePointVector>& Scales = SplineData->SplineStruct.GetSplinePointsScale().Points;
+#else
 			const TArray<FInterpCurvePointQuat>& Rots = SplineData->SplineStruct.SplineCurves.Rotation.Points;
 			const TArray<FInterpCurvePointVector>& Scales = SplineData->SplineStruct.SplineCurves.Scale.Points;
+#endif
 			const bool bImportRotAndScale = (Input->GetSettings().bImportRotAndScale && !Rots.IsEmpty() && !Scales.IsEmpty());
 			TArray<float> PosData; PosData.Reserve(Points.Num() * 3);
 			TArray<float> ArriveTangentData; ArriveTangentData.Reserve(Points.Num() * 3);
@@ -623,7 +895,7 @@ bool FHoudiniPCGComponentInput::HapiRetrieveData(UHoudiniInput* Input, const UOb
 
 			++InOutDataIdx;
 		}
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5		
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)		
 		else if (const UPCGDynamicMeshData* DMData = Cast<UPCGDynamicMeshData>(TaggedData.Data))
 		{
 			if (!IsValid(DMData->GetDynamicMesh()))

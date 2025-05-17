@@ -13,9 +13,13 @@
 #include "HoudiniPCGCommon.h"
 
 #include "PCGDataAsset.h"
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 6)) || (ENGINE_MAJOR_VERSION > 5)
+#include "Data/PCGPointArrayData.h"
+#else
 #include "Data/PCGPointData.h"
+#endif
 #include "Data/PCGSplineData.h"
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 #include "Data/PCGDynamicMeshData.h"
 #include "UDynamicMesh.h"
 #endif
@@ -26,7 +30,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiIsPartValid(const int32& NodeId, con
 	bOutShouldHoldByOutput = false;  // Only output to content as assets
 	bOutIsValid = false;
 
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 	if ((PartInfo.type == HAPI_PARTTYPE_MESH) || (PartInfo.type == HAPI_PARTTYPE_CURVE))  // Can output point cloud, splines, or dynamic mesh data
 #else
 	if (((PartInfo.type == HAPI_PARTTYPE_MESH) && (PartInfo.faceCount <= 0)) || (PartInfo.type == HAPI_PARTTYPE_CURVE))  // Can output point cloud or spline data
@@ -188,6 +192,77 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 		if ((PartInfo.type == HAPI_PARTTYPE_MESH) && (PartInfo.faceCount <= 0))  // Point cloud
 		{
 			FPCGTaggedData TaggedData;
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 6)) || (ENGINE_MAJOR_VERSION > 5)
+			UPCGPointArrayData* PointData = NewObject<UPCGPointArrayData>(PCGDA);
+			TaggedData.Data = PointData;
+
+			HOUDINI_FAIL_RETURN(HapiGetTags(NodeId, PartId,
+				FHoudiniEngineUtils::QueryAttributeOwner(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_UNREAL_PCG_TAGS), TaggedData.Tags));
+
+			const int32& PointCount = PartInfo.pointCount;
+			PointData->SetNumPoints(PointCount);
+			{  // Transform
+				TArray<HAPI_Transform> HapiTransforms;
+				HapiTransforms.SetNumUninitialized(PointCount);
+				if (PartInfo.instancedPartCount >= 1)
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetInstancerPartTransforms(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+						HAPI_SRT, HapiTransforms.GetData(), 0, PointCount))
+				else
+					HAPI_SESSION_FAIL_RETURN(FHoudiniApi::GetInstanceTransformsOnPart(FHoudiniEngine::Get().GetSession(), NodeId, PartId,
+						HAPI_SRT, HapiTransforms.GetData(), 0, PointCount))
+
+				TPCGValueRange<FTransform> Transforms = PointData->GetTransformValueRange();
+				for (int32 PointIdx = 0; PointIdx < PointCount; ++PointIdx)
+				{
+					const HAPI_Transform& HapiTransform = HapiTransforms[PointIdx];
+					FTransform& Transform = Transforms[PointIdx];
+					Transform.SetLocation(FVector(HapiTransform.position[0], HapiTransform.position[2], HapiTransform.position[1]) * POSITION_SCALE_TO_UNREAL_F);
+					Transform.SetRotation(FQuat(HapiTransform.rotationQuaternion[0], HapiTransform.rotationQuaternion[2], HapiTransform.rotationQuaternion[1], -HapiTransform.rotationQuaternion[3]));
+					Transform.SetScale3D(FVector(HapiTransform.scale[0], HapiTransform.scale[2], HapiTransform.scale[1]));
+				}
+			}
+
+			if (FHoudiniEngineUtils::IsAttributeExists(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_DENSITY, HAPI_ATTROWNER_POINT))  // f@density
+			{
+				HAPI_AttributeOwner Owner = HAPI_ATTROWNER_POINT;
+				TArray<float> Data;
+				HOUDINI_FAIL_RETURN(FHoudiniEngineUtils::HapiGetFloatAttributeData(NodeId, PartId, HAPI_ATTRIB_DENSITY, 1, Data, Owner));
+				TPCGValueRange<float> Densities = PointData->GetDensityValueRange();
+				for (int32 PointIdx = 0; PointIdx < PointCount; ++PointIdx)
+					Densities[PointIdx] = Data[PointIdx];
+			}
+
+			{
+				TArray<float> ColorData;
+				if (FHoudiniEngineUtils::IsAttributeExists(AttribNames, PartInfo.attributeCounts, HAPI_ATTRIB_COLOR, HAPI_ATTROWNER_POINT))  // v@Cd
+				{
+					HAPI_AttributeOwner Owner = HAPI_ATTROWNER_POINT;
+					HOUDINI_FAIL_RETURN(FHoudiniEngineUtils::HapiGetFloatAttributeData(NodeId, PartId, HAPI_ATTRIB_COLOR, 3, ColorData, Owner));
+				}
+				TArray<float> AlphaData;
+				if (FHoudiniEngineUtils::IsAttributeExists(AttribNames, PartInfo.attributeCounts, HAPI_ALPHA, HAPI_ATTROWNER_POINT))  // f@Alpha
+				{
+					HAPI_AttributeOwner Owner = HAPI_ATTROWNER_POINT;
+					HOUDINI_FAIL_RETURN(FHoudiniEngineUtils::HapiGetFloatAttributeData(NodeId, PartId, HAPI_ALPHA, 1, AlphaData, Owner));
+				}
+				if (!ColorData.IsEmpty() && !AlphaData.IsEmpty())
+				{
+					TPCGValueRange<FVector4> Colors = PointData->GetColorValueRange();
+					for (int32 PointIdx = 0; PointIdx < PointCount; ++PointIdx)
+					{
+						FVector4& Color = Colors[PointIdx];
+						if (!ColorData.IsEmpty())
+						{
+							Color.X = ColorData[PointIdx * 3];
+							Color.Y = ColorData[PointIdx * 3 + 1];
+							Color.Z = ColorData[PointIdx * 3 + 2];
+						}
+						if (!AlphaData.IsEmpty())
+							Color.W = AlphaData[PointIdx];
+					}
+				}
+			}
+#else
 			UPCGPointData* PointData = NewObject<UPCGPointData>(PCGDA);
 			TaggedData.Data = PointData;
 
@@ -196,7 +271,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 
 			const int32& PointCount = PartInfo.pointCount;
 
-			TArray<FPCGPoint> Points;
+			TArray<FPCGPoint>& Points = PointData->GetMutablePoints();
 			Points.SetNum(PointCount);
 			{  // Transform
 				TArray<HAPI_Transform> HapiTransforms;
@@ -257,9 +332,9 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 					}
 				}
 			}
-
+#endif
 			{  // TODO: check whether this is necessary
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 				TArray<int64> ParentEntryKeys;
 				for (int32 PointIdx = 0; PointIdx < PointCount; ++PointIdx)
 					ParentEntryKeys.Add(-1);
@@ -269,7 +344,6 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 					PointData->Metadata->AddEntry(-1);
 #endif
 			}
-			
 			TArray<PCGMetadataEntryKey> EntryKeys;
 			for (int32 AttribIdx = PartInfo.attributeCounts[HAPI_ATTROWNER_VERTEX];
 				AttribIdx < PartInfo.attributeCounts[HAPI_ATTROWNER_VERTEX] + PartInfo.attributeCounts[HAPI_ATTROWNER_POINT]; ++AttribIdx)
@@ -522,9 +596,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 					}
 				}
 			}
-
-			PointData->SetPoints(Points);
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 			PCGDA->Data.AddData(TaggedData, TaggedData.ComputeCrc(false));
 #else
 			PCGDA->Data.AddData({ TaggedData }, { TaggedData.ComputeCrc(false) });
@@ -682,7 +754,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 				SplineData->SplineStruct.UpdateSpline();
 				SplineData->SplineStruct.Bounds = SplineData->SplineStruct.GetBounds();
 				SplineData->SplineStruct.LocalBounds = SplineData->SplineStruct.Bounds;
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 				PCGDA->Data.AddData(TaggedData, TaggedData.ComputeCrc(false));
 #else
 				PCGDA->Data.AddData({ TaggedData }, { TaggedData.ComputeCrc(false) });
@@ -691,7 +763,7 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 				++CurveIdx;
 			}
 		}
-#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 5
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 		if ((PartInfo.type == HAPI_PARTTYPE_MESH) && (PartInfo.faceCount >= 1))  // Mesh
 		{
 			FPCGTaggedData TaggedData;
