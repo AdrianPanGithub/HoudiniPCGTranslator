@@ -1,4 +1,4 @@
-// Copyright (c) <2025> Yuzhe Pan (childadrianpan@gmail.com). All Rights Reserved.
+// Copyright Yuzhe Pan (childadrianpan@gmail.com). All Rights Reserved.
 
 #include "HoudiniInputPCGComponent.h"
 
@@ -10,6 +10,8 @@
 #include "HoudiniPCGCommon.h"
 
 #include "PCGComponent.h"
+
+#include "PCGParamData.h"
 #include "Data/PCGPointData.h"
 #if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 6)) || (ENGINE_MAJOR_VERSION > 5)
 #include "Data/PCGPointArrayData.h"
@@ -213,8 +215,8 @@ bool FHoudiniPCGComponentInput::HapiRetrieveData(UHoudiniInput* Input, const UOb
 				HAPI_SESSION_FAIL_RETURN(FHoudiniApi::CreateNode(FHoudiniEngine::Get().GetSession(), Input->GetGeoNodeId(), "null",
 					TCHAR_TO_UTF8(*FString::Printf(TEXT("%s_%s_%08X"), *InputObject->GetName(), *TaggedData.Data->GetName(), FPlatformTime::Cycles())),
 					false, &NodeId))
-				//else
-				//	HAPI_SESSION_FAIL_RETURN(FHoudiniApi::RevertGeo(FHoudiniEngine::Get().GetSession(), NodeId));  // Why this can NOT revert geo after next commit?
+			//else
+			//	HAPI_SESSION_FAIL_RETURN(FHoudiniApi::RevertGeo(FHoudiniEngine::Get().GetSession(), NodeId));  // Why this can NOT revert geo after next commit?
 
 			{
 				TConstPCGValueRange<FTransform> Transforms = PointData->GetConstTransformValueRange();
@@ -711,6 +713,10 @@ bool FHoudiniPCGComponentInput::HapiRetrieveData(UHoudiniInput* Input, const UOb
 			}
 
 			++InOutDataIdx;
+		}
+		else if (const UPCGParamData* ParamData = Cast<UPCGParamData>(TaggedData.Data))
+		{
+
 		}
 		else if (const UPCGSplineData* SplineData = Cast<UPCGSplineData>(TaggedData.Data))
 		{

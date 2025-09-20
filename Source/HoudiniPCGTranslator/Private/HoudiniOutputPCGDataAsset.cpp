@@ -1,4 +1,4 @@
-// Copyright (c) <2025> Yuzhe Pan (childadrianpan@gmail.com). All Rights Reserved.
+// Copyright Yuzhe Pan (childadrianpan@gmail.com). All Rights Reserved.
 
 #include "HoudiniOutputPCGDataAsset.h"
 
@@ -334,7 +334,16 @@ bool FHoudiniPCGDataAssetOutputBuilder::HapiRetrieve(AHoudiniNode* Node, const F
 			}
 #endif
 			{  // TODO: check whether this is necessary
-#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
+#if ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 6)) || (ENGINE_MAJOR_VERSION > 5)
+				TPCGValueRange<int64> Entries = PointData->GetMetadataEntryValueRange();
+				TArray<int64> ParentEntryKeys;
+				for (int32 PointIdx = 0; PointIdx < PointCount; ++PointIdx)
+				{
+					ParentEntryKeys.Add(-1);
+					Entries[PointIdx] = int64(PointIdx);
+				}
+				PointData->Metadata->GetMetadataDomain(EPCGMetadataDomainFlag::Elements)->AddEntries(ParentEntryKeys);
+#elif ((ENGINE_MAJOR_VERSION == 5) && (ENGINE_MINOR_VERSION >= 5)) || (ENGINE_MAJOR_VERSION > 5)
 				TArray<int64> ParentEntryKeys;
 				for (int32 PointIdx = 0; PointIdx < PointCount; ++PointIdx)
 					ParentEntryKeys.Add(-1);
