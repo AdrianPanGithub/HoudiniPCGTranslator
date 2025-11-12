@@ -2,12 +2,15 @@
 
 Welcome to the [repository](https://github.com/AdrianPanGithub/HoudiniPCGTranslator) for the Houdini PCG Translator For Unreal.
 
-This plug-in provides seamless integration between Houdini Engine and Unreal PCG, without any exchange files. Allow both PCGDataAsset input and output, and PCGComponent input.
-Also see [Tutorial](https://youtu.be/MLbhgsCSqoQ)
+This plug-in provides seamless integration between Houdini Engine and Unreal PCG:
+- Houdini Node in PCG Graph (Recommand >= 5.6).
+- Allow both PCGDataAsset input and output, and PCGComponent input, without any exchange files.
+- Support PCGPointData/PCGPointArrayData, PCGSplineData and PCGDynamicMeshData(>= 5.5)
+- Also see [Tutorial](https://youtu.be/MLbhgsCSqoQ)
 
 # Compatibility
 
-This plug-in relies on **my custom** [HoudiniEngineForUnreal](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal), so similar [compatibility](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal#compatibility) as the Houdini Engine, but only support Unreal >= 5.4 (Examples only run with 5.5).
+This plug-in relies on **my custom** [HoudiniEngineForUnreal](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal), so similar [compatibility](https://github.com/AdrianPanGithub/HoudiniEngineForUnreal#compatibility) as the Houdini Engine, but only support Unreal >= 5.4 (Examples only run with >= 5.5, PCG Houdini Node Example only run with >= 5.6).
 
 # Installation
 01. In this GitHub [repository](https://github.com/AdrianPanGithub/HoudiniPCGTranslator), click [Releases](https://github.com/AdrianPanGithub/HoudiniPCGTranslator/releases) on the right side. 
@@ -17,15 +20,19 @@ This plug-in relies on **my custom** [HoudiniEngineForUnreal](https://github.com
     e.g. `C:/Unreal Projects/MyGameProject/Plugins/HoudiniPCGTranslator` and `C:/Unreal Projects/MyGameProject/Plugins/HoudiniEngine`
 
 # Tutorial/Example
-[Tutorial](https://youtu.be/MLbhgsCSqoQ)
+- [Tutorial](https://youtu.be/MLbhgsCSqoQ)
 Require Unreal Engine >= 5.5 to run these examples.
 See `/HoudiniPCGTranslator/Example/EUBP_HE_Example_PCGDataInput` and `/HoudiniPCGTranslator/Example/he_example_pcg_data_output` in the content of this plug-in.
+- Houdini Node in PCG Graph Example Require Unreal Engine >= 5.6.
+See `/HoudiniPCGTranslator/Example/PCG_HE_Example_HoudiniNode`
 
 # Usage Brief
 
+Support Houdini Node in PCG Graph.
+
 Support both input and output of PCGDataAsset and input of PCGComponent(**Wire the data to the output node in PCGGraph**, then Using actors(world) input)
 
-Support PCGPointData, PCGSplineData and PCGDynamicMeshData(>= 5.5)
+Support PCGPointData/PCGPointArrayData, PCGSplineData and PCGDynamicMeshData(>= 5.5)
 
 Here are some attributes for PCG data input and output
 
